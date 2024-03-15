@@ -33,10 +33,6 @@ df['max reps'] = split_reps[1]
 df['max reps'] = df['max reps'].apply(lambda x: int(x) if x.isdigit() else x)
 
 print(df[['min reps', 'max reps']])
-
-# Define the layout of the app
-
-# Define the layout of the app
 app.layout = html.Div([
     html.H1("Gym Exercise Dashboard"),
     
@@ -47,22 +43,22 @@ app.layout = html.Div([
         value=list(all_muscles)[0],
         multi=False
     ),
-    
-    # Text for displaying exercise information
-    html.Div(id='exercise-list-output'),
 
-    # Graphs for displaying difficulty level, min reps, and max reps
+    # Graph for displaying ratio fatiga estimulo colored by Extendido/Contraido
+    dcc.Graph(id='ratio-extendido-chart'),
+
+    # Graphs for displaying ratio fatiga estimulo, difficulty level, min reps, and max reps
+    dcc.Graph(id='ratio-chart'),
     dcc.Graph(id='difficulty-chart'),
-    dcc.Graph(id='reps-chart'),
-    dcc.Graph(id='ratio-chart')
+    dcc.Graph(id='reps-chart')
 ])
 
-# Define callback to update exercise list, difficulty chart, and reps chart based on dropdown selection
+# Define callback to update charts based on dropdown selection
 @app.callback(
-    [Output('exercise-list-output', 'children'),
+    [Output('ratio-extendido-chart', 'figure'),
+     Output('ratio-chart', 'figure'),
      Output('difficulty-chart', 'figure'),
-     Output('reps-chart', 'figure'),
-     Output('ratio-chart', 'figure')],
+     Output('reps-chart', 'figure')],
     [Input('muscle-dropdown', 'value')]
 )
 def update_content(selected_muscle):
@@ -72,19 +68,43 @@ def update_content(selected_muscle):
     # Use lower() to make the comparison case-insensitive
     filtered_df = df[df['Musculos empleados'].str.lower().str.contains(selected_muscle.lower(), na=False)]
     
-    # Get the list of exercises
-    exercise_list = filtered_df['Ejercicios'].tolist()
-    
-    # Display the list as a comma-separated string
-    exercise_str = ', '.join(exercise_list)
+    # Create a bar chart for ratio fatiga estimulo colored by Extendido/Contraido
+    ratio_extendido_chart = px.bar(
+        filtered_df,
+        x='Ejercicios',
+        y='Ratio Fatiga-Estimulo',
+        title=f'Ratio Fatiga-Estimulo Dividido por la Posicion del Musculo, Independiente del Musculo Elegido: {selected_muscle}',
+        color='Extendido/Contraido',  # Color based on Extendido/Contraido
+        labels={'Ratio Fatiga-Estimulo': 'Ratio Fatiga-Estimulo'},
+    )
+
+    # Create a bar chart for ratio fatiga estimulo
+    ratio_chart = px.bar(
+        filtered_df,
+        x='Ejercicios',
+        y='Ratio Fatiga-Estimulo',
+        title=f'Ratio Fatiga-Estimulo Dividido por Exigencia al Cuerpo en General, Independiente del Musculo Elegido: {selected_muscle}',
+        color='Aislacion/Compuesto',  # Color based on Aislacion/Compuesto
+        labels={'Ratio Fatiga-Estimulo': 'Ratio Fatiga-Estimulo'},
+    )
 
     # Create a sorted bar chart for difficulty level
     difficulty_chart = px.bar(
         filtered_df,
         x='Ejercicios',
         y='Dificultad',
-        title=f'Difficulty Level for {selected_muscle}',
+        title=f'Nivel de Dificultad del Ejercicio, Independiente del musculo elegido y Coloreado por Lesividad',
         labels={'Dificultad': 'Difficulty Level'},
+        color='Lesividad',  # Use 'Lesividad' column for color mapping
+        color_continuous_scale='RdYlGn_r',  # Red-Yellow-Green color scale
+    )
+
+    # Update color bar title
+    difficulty_chart.update_layout(coloraxis_colorbar=dict(title='Lesividad'))
+
+    # Sort the bars by difficulty level
+    difficulty_chart.update_layout(
+        xaxis=dict(categoryorder='total ascending')
     )
 
     # Create a stacked bar chart for min and max reps
@@ -92,21 +112,12 @@ def update_content(selected_muscle):
         filtered_df,
         x='Ejercicios',
         y=['min reps', 'max reps'],
-        title=f'Min and Max Reps for {selected_muscle}',
+        title=f'Repeticiones Minimas Y Maximas',
         labels={'value': 'Reps'},
         barmode='stack',
     )
 
-    ratio_chart = px.bar(
-        filtered_df,
-        x='Ejercicios',
-        y='Ratio Fatiga-Estimulo',
-        title=f'Ratio Fatiga-Estimulo for {selected_muscle}',
-        color='Aislacion/Compuesto',  # Color based on Aislacion/Compuesto
-        labels={'Ratio Fatiga-Estimulo': 'Ratio Fatiga-Estimulo'},
-    )
-
-    return f"Exercises involving {selected_muscle}: {exercise_str}", difficulty_chart, reps_chart, ratio_chart
+    return ratio_extendido_chart, ratio_chart, difficulty_chart, reps_chart
 
 # Run the app
 if __name__ == '__main__':
